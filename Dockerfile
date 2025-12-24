@@ -1,20 +1,28 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+﻿FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copia il file .csproj e fai restore
+COPY PhonebookAPI/PhonebookAPI.csproj PhonebookAPI/
+WORKDIR /src/PhonebookAPI
+RUN dotnet restore
+
+# Copia tutto il resto del codice
+WORKDIR /src
+COPY PhonebookAPI/ PhonebookAPI/
+
+# Build
+WORKDIR /src/PhonebookAPI
+RUN dotnet build -c Release -o /app/build
+
+# Publish
+RUN dotnet publish -c Release -o /app/publish
+
+# Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
+COPY --from=build /app/publish .
+
+ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
-COPY ["PhonebookAPI/PhonebookAPI.csproj", "PhonebookAPI/"]
-RUN dotnet restore "PhonebookAPI/PhonebookAPI.csproj"
-COPY PhonebookAPI/ PhonebookAPI/
-WORKDIR "/src/PhonebookAPI"
-RUN dotnet build "PhonebookAPI.csproj" -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish "PhonebookAPI.csproj" -c Release -o /app/publish /p:UseAppHost=false
-
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
-ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "PhonebookAPI.dll"]
